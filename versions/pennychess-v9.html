@@ -1,0 +1,1689 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pennychess — Prototype v9</title>
+<style>
+  :root{
+    --bg:#1c1712; --panel:#2a2119; --panel2:#332818; --ink:#f1e7d6; --muted:#b8a98c;
+    --light:#e8d3a3; --dark:#7c5a3a; --accent:#d9a441; --sel:#6fbf73; --move:#5aa7d6;
+    --white-pc:#f5efe0; --black-pc:#241a12; --danger:#c1594a; --label:#9a8362; --dead:#7a4fd6;
+    --confirmed:#6fbf73;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Georgia,'Times New Roman',serif;display:flex;min-height:100vh}
+  h1{font-size:20px;margin:0 0 4px;letter-spacing:.5px}
+  h2.panel-title{font-size:14px;color:var(--accent);margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px}
+  h3.sub-title{font-size:11px;color:var(--accent);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+  h3.sub-title:first-child{margin-top:0}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+  #levels{width:250px;background:var(--panel);padding:16px;overflow-y:auto;border-right:1px solid #000;flex-shrink:0}
+  .group-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin:14px 0 6px}
+  .lvl-btn{display:block;width:100%;text-align:left;background:var(--panel2);color:var(--ink);border:1px solid #000;
+    border-radius:6px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-family:inherit;font-size:13px}
+  .lvl-btn:hover{background:#3d2f1c}
+  .lvl-btn.active{outline:2px solid var(--accent)}
+  .lvl-btn small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .lvl-btn.locked{opacity:.45;cursor:not-allowed}
+  .side-details{margin-top:14px;border-top:1px solid #443624;padding-top:10px;font-size:12px;color:var(--muted)}
+  .side-details summary{cursor:pointer;color:var(--accent);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+  .side-details .rule-body{margin-top:8px;line-height:1.5}
+  .side-details .rule-body h4{color:var(--accent);font-size:12px;margin:12px 0 4px}
+  .side-details .rule-body h4:first-child{margin-top:0}
+  .side-details .rule-body ul{margin:4px 0;padding-left:18px}
+  .side-details .rule-body li{margin-bottom:3px}
+  .side-details .rule-body p{margin:4px 0}
+  .side-details .qa{margin-bottom:10px}
+  .side-details .qa b{color:var(--ink);display:block;margin-bottom:2px}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:24px;gap:14px;max-width:1000px;margin:0 auto}
+  #hud{display:flex;gap:18px;align-items:center;font-size:14px}
+  #hud .stat{background:var(--panel);padding:6px 12px;border-radius:6px;border:1px solid #000}
+  #hud .stat b{color:var(--accent)}
+
+  #playArea{display:flex;gap:18px;align-items:flex-start}
+
+  #boardOuter{display:grid;grid-template-columns:22px repeat(8,60px) 22px;grid-template-rows:22px repeat(8,60px) 22px;
+    border:4px solid #000;box-shadow:0 8px 24px rgba(0,0,0,.5);position:relative;background:#000}
+  .glabel{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--label);user-select:none}
+  .sq{width:60px;height:60px;position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .sq.light{background:var(--light)} .sq.dark{background:var(--dark)}
+  .sq.selected{outline:3px solid var(--sel);outline-offset:-3px;z-index:2}
+  .sq.legal::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:rgba(90,167,214,.75)}
+  .sq.legal.occupied::after{width:52px;height:52px;border-radius:8px;background:transparent;border:4px solid var(--move)}
+  .sq.pending{outline:3px solid var(--danger);outline-offset:-3px;z-index:2;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{outline-color:var(--danger)}50%{outline-color:#ffb199}}
+  #vectorLayer{position:absolute;left:22px;top:22px;width:480px;height:480px;pointer-events:none;z-index:3}
+  .pc{font-size:38px;line-height:1;user-select:none}
+  .pc.w{color:var(--white-pc);text-shadow:0 0 2px #000,0 0 1px #000}
+  .pc.b{color:var(--black-pc);text-shadow:0 0 2px #7c5a3a}
+  .penny{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-weight:bold;font-size:17px;position:relative;box-shadow:inset 0 0 0 2px rgba(0,0,0,.4),0 2px 4px rgba(0,0,0,.5)}
+  .penny.w{background:radial-gradient(circle at 35% 30%,#fff4cf,#d9a441 70%);color:#3a2a08}
+  .penny.b{background:radial-gradient(circle at 35% 30%,#d9d9d9,#8a8a8a 70%);color:#1a1a1a}
+  .penny.combined{background:conic-gradient(#d9a441 0 180deg,#8a8a8a 180deg 360deg);color:#111}
+  .penny .shield{position:absolute;bottom:-6px;right:-6px;background:#2e6b33;color:#eaffea;border-radius:50%;
+    width:15px;height:15px;font-size:9px;display:flex;align-items:center;justify-content:center;border:1px solid #000}
+
+  #reactionPanel{width:280px;background:var(--panel);border:1px solid #000;border-radius:8px;padding:14px;
+    min-height:200px;flex-shrink:0}
+  #reactionPanel .status{font-size:13px;color:var(--muted);margin-bottom:10px}
+  #reactionPanel .prompt{font-size:12px;color:var(--ink);margin-bottom:6px;line-height:1.4}
+  .reaction-subtitle{font-style:italic;font-size:11px;color:var(--muted);margin:-4px 0 10px}
+  .choice-btn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--panel2);
+    color:var(--ink);border:1px solid #000;border-radius:6px;padding:8px 10px;margin-bottom:6px;cursor:pointer;
+    font-family:inherit;font-size:12px}
+  .choice-btn:hover{background:#3d2f1c}
+  .swatch{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .mini-box{background:var(--panel2);border:1px solid #000;border-radius:6px;padding:8px 10px;font-size:12px;
+    color:var(--ink);line-height:1.4;min-height:18px}
+  .group-block{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #443624}
+  .group-block:last-of-type{border-bottom:none}
+  .confirmed-row{border-left:3px solid var(--confirmed);font-size:12px}
+  #applyStepBtn{width:100%;margin-top:4px}
+  button.action:disabled{opacity:.4;cursor:not-allowed}
+  .history-box{background:var(--panel2);border:1px solid #000;border-radius:6px;padding:6px 8px;
+    max-height:220px;overflow-y:auto;font-size:11px}
+  .hist-entry{padding:4px 2px;border-bottom:1px solid #241c12;line-height:1.4}
+  .hist-entry:last-child{border-bottom:none}
+  .hist-entry.hist-move{color:var(--move)}
+  .hist-entry.hist-reaction{color:var(--muted)}
+  .hist-entry.hist-deadend{color:var(--dead);font-weight:bold}
+  .hist-entry.hist-undo{color:var(--danger);font-style:italic}
+
+  #msg{min-height:20px;font-size:13px;color:var(--accent);text-align:center}
+  button.action{background:var(--panel2);color:var(--ink);border:1px solid #000;border-radius:6px;padding:8px 14px;
+    cursor:pointer;font-family:inherit;font-size:13px}
+  button.action:hover:not(:disabled){background:#3d2f1c}
+  #controls{display:flex;gap:10px}
+
+  .infopanel{width:100%;max-width:900px;background:var(--panel);border:1px solid #000;border-radius:8px;padding:14px 18px}
+  #pieceTable{width:100%;border-collapse:collapse;font-size:12px}
+  #pieceTable th{text-align:left;color:var(--accent);font-size:11px;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #443624}
+  #pieceTable td{padding:6px 8px;border-bottom:1px solid #2a2119;vertical-align:top}
+  #pieceTable .glyphcell{font-size:22px;width:36px;text-align:center}
+  #levelDesc{font-size:13px;color:var(--ink);line-height:1.5}
+  #gameRules{font-size:12px;color:var(--muted);line-height:1.6;margin:0;padding-left:18px}
+
+  #notes{max-width:900px;width:100%;background:var(--panel);border:1px solid #000;border-radius:8px;padding:12px 16px;font-size:13px;color:var(--muted)}
+  #notes summary{cursor:pointer;color:var(--accent);font-size:13px}
+  #notes ul{margin:8px 0 0;padding-left:20px}
+  #notes li{margin-bottom:4px}
+
+  #win{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;
+    flex-direction:column;z-index:60;text-align:center}
+  #win.show{display:flex}
+  #win h2{color:var(--accent);font-size:32px;margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<div id="levels">
+  <h1>Pennychess</h1>
+  <div class="sub">Prototype v9 — stack the pennies</div>
+  <div id="level-list"></div>
+
+  <details class="side-details">
+    <summary>Full Rule Set</summary>
+    <div class="rule-body" id="fullRuleSet"></div>
+  </details>
+
+  <details class="side-details">
+    <summary>FAQs</summary>
+    <div class="rule-body" id="faqBody"></div>
+  </details>
+</div>
+
+<main>
+  <div id="hud">
+    <div class="stat">Moves: <b id="moveCount">0</b></div>
+    <div class="stat">Minimum: <b id="moveMin">–</b></div>
+    <div class="stat" id="levelName">–</div>
+  </div>
+
+  <div id="playArea">
+    <div id="boardOuter"></div>
+    <div id="reactionPanel">
+      <h2 class="panel-title" id="reactionTitle">Reactions</h2>
+      <div class="reaction-subtitle" id="reactionSubtitle" style="display:none"></div>
+      <div class="status" id="reactionStatus">Ready.</div>
+      <div id="reactionBody"></div>
+      <div id="sideExtra"></div>
+    </div>
+  </div>
+
+  <div id="msg"></div>
+  <div id="controls">
+    <button class="action" id="undoBtn">Undo</button>
+    <button class="action" id="resetBtn">Reset Level</button>
+  </div>
+
+  <div class="infopanel">
+    <h2 class="panel-title">How the pieces work</h2>
+    <table id="pieceTable"></table>
+  </div>
+
+  <div class="infopanel">
+    <h2 class="panel-title">Level description</h2>
+    <div id="levelDesc"></div>
+  </div>
+
+  <div class="infopanel">
+    <h2 class="panel-title">Game rules — quick summary</h2>
+    <ul id="gameRules">
+      <li>You only move your own (white / "heads") pieces. Black never moves on its own — it only reacts.</li>
+      <li><b>Goal:</b> get the two pennies (the kings) to land on the same square.</li>
+      <li>No piece is ever captured or removed. Pieces only move, swap places, or "stack."</li>
+      <li>A Rook/Bishop/Queen's force always stops at the very first piece in its line — that piece
+        alone is affected, and nothing beyond it is reached this step.</li>
+      <li>Knights are portals for forces (Knortal): a force that reaches a knight exits from a
+        <i>different</i> knight elsewhere on the board, direction conserved, and it's that exit
+        knight that actually gets moved.</li>
+      <li>Any piece's own move that would otherwise be blocked by a knight can instead choose to
+        land on the knight's square, swapping places with it.</li>
+      <li>After every move, the board settles in a series of "steps." Every single movement in a
+        step — even an unambiguous one — is shown to you with an arrow before it happens, and a
+        step only applies once you've resolved every choice in it and clicked Apply Step.</li>
+      <li>If two or more forces would act on the same piece (or two pieces would land on the same
+        square) within one step, you pick which one wins before that step can apply.</li>
+      <li>A pawn can move onto its own penny to "shield" it — a shielded penny ignores every
+        force except from an opposing Queen.</li>
+      <li>See "Full Rule Set" in the left sidebar for the complete, detailed ruleset.</li>
+    </ul>
+  </div>
+
+  <details id="notes">
+    <summary>Design notes &amp; what's not implemented yet</summary>
+    <p>Built from <b>Pennychess 1.1, "BOTH Rules and Puzzles"</b> (the fullest, most-current
+    rules+puzzles document in the folder — it already folds in the level progression and the
+    Multidimensionality/Non-Euclidean clause) plus the standalone <b>"MORE levels"</b> PDF
+    (Queens Corner, Knights Only, Four-Nineties). The other PDFs in the folder are earlier or
+    parallel drafts of the same material and weren't used as the source of truth.</p>
+    <p><b>Interpretation calls made</b> (the source is a personal notes document, not a spec —
+    these are reasonable readings, not certainties):</p>
+    <ul>
+      <li>Kings/Pennies move normally like a chess king (1 square, any direction) — "purely
+        reactionary" is read as "has no push/pull effect on others," not "cannot be moved."</li>
+      <li>Queen effect = Rook's pull along its straight lines, Bishop's push along its diagonals.</li>
+      <li><b>Rook/Bishop/Queen effects apply to opposite-color pieces only.</b> The doc's literal
+        text ("attracts same," "pushes same") reads as affecting your own pieces too, but that
+        was tested and rejected: it makes the initial pre-move board-check on the standard Level 1
+        setup cascade into an outright win at 0 moves (your own queen/bishop are diagonally
+        touching your own pawn at the start of any standard game), which contradicts the doc's own
+        "6 MOVE-MINIMUM SOLVE" for that level. Pawn's same-color rule ("neutral") is unambiguous
+        in the source, so that one rule was extended to Rook/Bishop/Queen for a playable result.</li>
+      <li><b>Every ray "short-stops" at the first piece it meets — always, no exceptions,
+        including knights.</b> The knight is still special (see Knortal below) — it just doesn't
+        get skipped over as invisible anymore.</li>
+      <li><b>Knortal, once a portal is entered, always conserves the ray's outward direction of
+        travel — not "push" vs "pull" relative to the original source.</b> The source doc's exact
+        words are "direction conserved." Once a force is severed from its original source by the
+        portal, "pull toward the source" no longer has a coherent meaning (there's no single
+        "source direction" left to pull toward), so the exit knight is always displaced 1 square
+        further along the same (row,col) direction the ray was already traveling when it entered
+        the first knight — regardless of whether the entering force came from a Rook (a "puller")
+        or a Bishop (a "pusher"). Documented as an interpretation call rather than silently decided.</li>
+      <li><b>Only the exit knight moves; the entry knight is a fixed conduit.</b> The source
+        material's language ("comes out of the other") reads as the effect manifesting at the
+        exit, not being duplicated at both ends — so the knight the force first reaches stays
+        exactly where it is; only the knight it exits through is what may be pushed/pulled.</li>
+      <li>Levels 2/3's parenthetical ("only friendly/opposing pawns and kings") is treated as
+        loose flavor text; the literal sentence ("standard, minus opposing/friendly pawns") is
+        what's built.</li>
+    </ul>
+    <p><b>Not implemented in this prototype</b> — flagged rather than faked:</p>
+    <ul>
+      <li>Multi-board / non-Euclidean boards (the "Standard, Both Boards" level is shown locked).</li>
+      <li>Knight-portal chains longer than one hop (force enters knight A, exits knight B, and B's
+        own destination happens to be a third knight C) — that case is treated as blocked/void
+        rather than continuing the chain through C.</li>
+      <li>Castling.</li>
+    </ul>
+    <p><b>v2 changes from v1:</b> non-blocking arrow-based conflict UI, board coordinates, piece
+    cheat-sheet, level descriptions, simplified rules summary.</p>
+    <p><b>v3 changes from v2:</b> fixed the arrow overlay corrupting the board's CSS Grid layout
+    (it used explicit grid placement over cells the auto-placed squares also needed — moved to
+    absolute positioning instead, which doesn't touch grid flow).</p>
+    <p><b>v4 changes from v3:</b></p>
+    <ul>
+      <li>Pawns can now move 2 squares on their first move (both squares must be empty), tracked
+        per-pawn.</li>
+      <li>Knight force-effects rebuilt: Knortal, Kuantum-tunneling, and Kneleportation replaced
+        the old "auto-swaps with an opposing knight in range" mechanic, which wasn't in the
+        source ruleset and was the real cause of pieces getting shoved around near knights.</li>
+      <li>Dead-End detection: the same conflict recurring 3 times in a row auto-resolves as no
+        movement ("Net Force Zero...") instead of being re-prompted a 4th time.</li>
+      <li>New history panel and the Full Rule Set / FAQs dropdowns.</li>
+    </ul>
+    <p><b>v5 changes from v4:</b></p>
+    <ul>
+      <li>The Solved screen distinguishes "Perfect Solve!" / "NEW RECORD!" / "Solved!" outcomes.</li>
+      <li>The reaction system was rebuilt around full step-by-step transparency: every movement in
+        a step, including unambiguous ones, is shown with its own arrow before the step applies,
+        committing only once every real choice has been made and Apply Step is clicked.</li>
+      <li>Arrow colors are generated per-render for whatever's on screen, instead of a fixed
+        palette — fixed a latent mis-colored-arrowhead bug.</li>
+    </ul>
+    <p><b>v6 changes from v5:</b></p>
+    <ul>
+      <li>Rays short-stop at the first piece, always.</li>
+      <li>Last Reaction, Last Action/Move, and the Actions+Reactions History are now all shown
+        together, always — mid-reaction and during idle turns alike.</li>
+      <li>Reactions vs. Decisions, communicated explicitly, with the "REACTION: Single" /
+        "CHAIN-REACTION: Step N" title and "Simultaneous Reaction(s) [+ Decision(s)]" subtitle.</li>
+    </ul>
+    <p><b>v7 changes from v6:</b></p>
+    <ul>
+      <li>Kuantum-tunneling extended to player-initiated moves — any piece's own move that would
+        otherwise be blocked by a knight can choose to land on it, swapping places.</li>
+      <li>Status text change: "Resolve each force below." → "Mediate the following
+        force-interactions with FREE WILL."</li>
+    </ul>
+    <p><b>v8 changes from v7:</b></p>
+    <ul>
+      <li><b>Knortal rebuilt as a real portal, not transparency.</b> v4–v7 made knights simply
+        invisible to ray-based forces (the ray passed straight through in place, as if the knight
+        weren't there, and never affected it). That wasn't what "Knortal" in the source doc
+        actually describes. v8 replaces it: a force that reaches a knight (its first hit, per the
+        short-stop rule — knights are no longer skipped) is transmitted through that knight to a
+        <i>different</i> knight elsewhere on the board, direction conserved, and it's the <b>exit</b>
+        knight that's actually displaced 1 square further along that direction. If exactly one
+        other knight exists, that's the exit automatically; with 2+ other knights, you choose which
+        one; with none, the force has nowhere to go and fizzles. If the exit's destination is
+        empty, it just moves there. If occupied, you're offered the choice the source ruleset
+        describes directly: let the exit knight collide and swap places with what's there, or hold
+        its ground and not move at all.</li>
+      <li><b>Bug fix:</b> a pawn's 2-square first move couldn't land on a knight occupying the
+        second square — the empty-square check for the far square didn't have a knight-swap
+        fallback the way the near square already did. Fixed.</li>
+    </ul>
+    <p><b>v9 changes from v8:</b></p>
+    <ul>
+      <li><b>New level — "Free Play — Standard Chess," at the very top of the level list.</b>
+        A completely separate game mode, not an extension of the Pennychess physics engine below
+        it: ordinary chess movement, ordinary captures (pieces are actually removed — the "no
+        captures, ever" rule is specific to the physics ruleset and doesn't apply here), check,
+        checkmate, stalemate, castling (both sides, with the usual can't-castle-out-of/through/
+        into-check restrictions), en passant, and pawn promotion (choose Queen, Rook, Bishop, or
+        Knight). No pennies, no reactions, no board-check cascade, no shields, no Knortal — the
+        Kings render and move as ordinary chess kings. Either side can be picked up and moved on
+        whoever's turn it is, so this level works solo (moving both colors yourself) or as a
+        local pass-and-play game shared with someone else at the same keyboard and mouse.</li>
+      <li><b>Not implemented, flagged rather than faked:</b> draws by the 50-move rule, threefold
+        repetition, or insufficient material are not detected — only checkmate and stalemate end
+        the game. There's also no move list/notation export and no time control, since none of
+        that was asked for.</li>
+      <li>This is unrelated to the still-open "Castling" item in the project's own not-yet-
+        implemented list — that entry is specifically about castling as a Pennychess physics
+        mechanic (integrated with pushes/pulls/Knortal), which this free-play mode doesn't touch
+        at all; it's ordinary chess castling in an ordinary chess ruleset running side-by-side
+        with the physics game, not a Pennychess feature.</li>
+    </ul>
+  </details>
+</main>
+
+<div id="win">
+  <h2 id="winTitle">Solved!</h2>
+  <div id="winDetail" style="margin-bottom:16px"></div>
+  <button class="action" id="winClose">Close</button>
+</div>
+
+<script>
+/* ---------- board helpers ---------- */
+const inBounds=(r,c)=>r>=0&&r<8&&c>=0&&c<8;
+const emptyBoard=()=>Array.from({length:8},()=>Array(8).fill(null));
+const place=(b,r,c,type,color)=>{ b[r][c]={type,color}; };
+const clone=(b)=>JSON.parse(JSON.stringify(b));
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=String(s); return d.innerHTML; }
+
+const ORTHO=[[-1,0],[1,0],[0,-1],[0,1]];
+const DIAG=[[-1,-1],[-1,1],[1,-1],[1,1]];
+const ALLD=[...ORTHO,...DIAG];
+const KOFF=[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+
+function fullStandardBoard(){
+  const b=emptyBoard();
+  const order=['R','N','B','Q','K','B','N','R'];
+  for(let c=0;c<8;c++){ place(b,0,c,order[c],'b'); place(b,7,c,order[c],'w'); }
+  for(let c=0;c<8;c++){ place(b,1,c,'P','b'); place(b,6,c,'P','w'); }
+  return b;
+}
+function stripBackRankTypes(b, types){
+  for(const r of [0,7]) for(let c=0;c<8;c++){
+    const p=b[r][c];
+    if(p && types.includes(p.type)) b[r][c]=null;
+  }
+}
+
+/* ---------- levels ---------- */
+const LEVELS=[
+  {id:'freeplay',name:'Free Play — Standard Chess',min:null,group:'Free Play',standard:true,
+    desc:'A real, standard chessboard — ordinary chess movement and captures, check, checkmate, castling, en passant, and pawn promotion. No Pennychess physics, no forced reactions, no pennies. Move either side yourself, or share the mouse and keyboard with a friend for an actual pass-and-play game.',
+    setup(){ return fullStandardBoard(); }},
+  {id:'lvlm3',name:'Pre-Tutorial I — Face to Face',min:1,group:'Pre-Tutorial',
+    desc:'Just the two pennies. Yours starts directly behind the opposing one. One king-move is all it takes — this level exists purely to teach the win condition.',
+    setup(){ const b=emptyBoard(); place(b,7,4,'K','w'); place(b,6,4,'K','b'); return b; }},
+  {id:'lvlm2',name:'Pre-Tutorial II — Royal Aid',min:2,group:'Pre-Tutorial',
+    desc:'Both sides get a queen in addition to the king. Use your queen to pull the opposing penny before walking your own king in.',
+    setup(){ const b=emptyBoard(); place(b,7,4,'K','w'); place(b,7,3,'Q','w'); place(b,0,4,'K','b'); place(b,0,3,'Q','b'); return b; }},
+  {id:'lvlm1',name:'Pre-Tutorial III — Lone Aid',min:3,group:'Pre-Tutorial',
+    desc:'The opposing queen is gone — only your queen can influence the board. Nothing else will react on its own.',
+    setup(){ const b=emptyBoard(); place(b,7,4,'K','w'); place(b,7,3,'Q','w'); place(b,0,4,'K','b'); return b; }},
+  {id:'lvl0',name:'Level 0 — Pawnless',min:3,group:'Tutorial',
+    desc:'Full back ranks, no pawns anywhere. Long open lines mean rooks and queens can pull pieces from far across the board.',
+    setup(){ const b=emptyBoard(); const order=['R','N','B','Q','K','B','N','R']; for(let c=0;c<8;c++){place(b,0,c,order[c],'b'); place(b,7,c,order[c],'w');} return b; }},
+  {id:'lvl1',name:'Level 1 — Standard Setup',min:6,group:'Tutorial',
+    desc:'The full, ordinary chess starting position. Pawns block almost every line at first — you have to clear lanes before the physics can do any work.',
+    setup(){ return fullStandardBoard(); }},
+  {id:'lvl2',name:'Level 2 — No Opposing Pawns',min:5,group:'Tutorial',
+    desc:'Standard setup, but the opposing pawn wall is gone. Their back rank pieces are far more exposed to your influence.',
+    setup(){ const b=fullStandardBoard(); for(let c=0;c<8;c++) b[1][c]=null; return b; }},
+  {id:'lvl3',name:'Level 3 — No Friendly Pawns',min:6,group:'Tutorial',
+    desc:'Standard setup, but your own pawn wall is gone. Your back rank pieces have open lines immediately.',
+    setup(){ const b=fullStandardBoard(); for(let c=0;c<8;c++) b[6][c]=null; return b; }},
+  {id:'lvl4',name:'Level 4 — Minor-less',min:7,group:'Tutorial',
+    desc:'No rooks, knights, or bishops on either side — just kings, queens, and full pawn walls. The queens do all the work here.',
+    setup(){ const b=fullStandardBoard(); stripBackRankTypes(b,['R','N','B']); return b; }},
+  {id:'bpawn',name:'Bonus — Pawn Gauntlet',min:11,group:'Bonus',
+    desc:'Only kings and full pawn walls, nothing else. Pawns only push opposing pieces one step at a time, so this takes patience.',
+    setup(){ const b=emptyBoard(); place(b,7,4,'K','w'); place(b,0,4,'K','b');
+      for(let c=0;c<8;c++){place(b,6,c,'P','w'); place(b,1,c,'P','b');} return b; }},
+  {id:'bqc',name:'Bonus — Queens Corner',min:7,group:'Bonus',
+    desc:'Pawn walls stay, but rooks, knights and bishops are gone, and both queens start tucked in opposite corners next to their king.',
+    setup(){ const b=emptyBoard(); for(let c=0;c<8;c++){place(b,6,c,'P','w'); place(b,1,c,'P','b');}
+      place(b,7,0,'Q','w'); place(b,7,1,'K','w'); place(b,0,7,'Q','b'); place(b,0,6,'K','b'); return b; }},
+  {id:'bko',name:'Bonus — Knights Only',min:5,group:'Bonus',
+    desc:'Standard setup minus rooks, bishops and queens. With only 4 knights and 2 pawn walls in play, watch for forces routing between knights as portals (Knortal) — Kneleportation and the v7 player-move knight-swap both still work too.',
+    setup(){ const b=fullStandardBoard(); stripBackRankTypes(b,['R','B','Q']); return b; }},
+  {id:'b490',name:'Bonus — Four-Nineties',min:10,group:'Bonus',
+    desc:'Four corner clusters — each king and each queen sits in a corner surrounded by three pawns. Twelve pawns, two queens, two kings, nothing else.',
+    setup(){ const b=emptyBoard();
+      place(b,7,7,'K','w'); place(b,7,6,'P','w'); place(b,6,7,'P','w'); place(b,6,6,'P','w');
+      place(b,7,0,'Q','w'); place(b,7,1,'P','w'); place(b,6,0,'P','w'); place(b,6,1,'P','w');
+      place(b,0,7,'K','b'); place(b,0,6,'P','b'); place(b,1,7,'P','b'); place(b,1,6,'P','b');
+      place(b,0,0,'Q','b'); place(b,0,1,'P','b'); place(b,1,0,'P','b'); place(b,1,1,'P','b');
+      return b; }},
+  {id:'locked2b',name:'"Standard, Both Boards" (14-move)',min:14,group:'Not Implemented',locked:true,
+    desc:'Requires two linked 8x8 boards with knight-portal travel between them — not implemented in this prototype.'},
+];
+
+/* ---------- move generation ---------- */
+// Sliding pieces stop at the first occupied square, same as ever — but if that square holds a
+// knight, landing there (swapping with it) is offered as an extra optional destination.
+function slide(board,r,c,dirs,res){
+  for(const [dr,dc] of dirs){
+    let rr=r+dr, cc=c+dc;
+    while(inBounds(rr,cc)){
+      const t=board[rr][cc];
+      if(!t){ res.push({r:rr,c:cc,kind:'move'}); rr+=dr; cc+=dc; }
+      else {
+        if(t.type==='N') res.push({r:rr,c:cc,kind:'swap'});
+        break;
+      }
+    }
+  }
+}
+function legalDestinations(board,r,c){
+  const piece=board[r][c]; if(!piece||piece.color!=='w') return [];
+  const res=[];
+  switch(piece.type){
+    case 'K':
+      for(const [dr,dc] of ALLD){
+        const rr=r+dr, cc=c+dc; if(!inBounds(rr,cc)) continue;
+        const t=board[rr][cc];
+        if(!t) res.push({r:rr,c:cc,kind:'move'});
+        else if(t.type==='K' && t.color==='b') res.push({r:rr,c:cc,kind:'stack-win'});
+        else if(t.type==='N') res.push({r:rr,c:cc,kind:'swap'});
+      }
+      break;
+    case 'Q': slide(board,r,c,ALLD,res); break;
+    case 'R': slide(board,r,c,ORTHO,res); break;
+    case 'B': slide(board,r,c,DIAG,res); break;
+    case 'N':
+      for(const [dr,dc] of KOFF){
+        const rr=r+dr, cc=c+dc; if(!inBounds(rr,cc)) continue;
+        const t=board[rr][cc];
+        if(!t) res.push({r:rr,c:cc,kind:'move'});
+        else res.push({r:rr,c:cc,kind:'swap'});
+      }
+      break;
+    case 'P': {
+      const oneR=r-1, oneC=c;
+      if(inBounds(oneR,oneC)){
+        const t=board[oneR][oneC];
+        if(!t){
+          res.push({r:oneR,c:oneC,kind:'move'});
+          if(!piece.moved){
+            const twoR=r-2;
+            if(inBounds(twoR,oneC)){
+              const t2=board[twoR][oneC];
+              if(!t2) res.push({r:twoR,c:oneC,kind:'move'});
+              else if(t2.type==='N') res.push({r:twoR,c:oneC,kind:'swap'});
+            }
+          }
+        } else if(t.type==='K' && t.color==='w' && !t.shield){
+          res.push({r:oneR,c:oneC,kind:'stack-shield'});
+        } else if(t.type==='N'){
+          res.push({r:oneR,c:oneC,kind:'swap'});
+        }
+      }
+      break;
+    }
+  }
+  return res;
+}
+
+function applyPlayerMove(board, from, dest){
+  const piece=board[from.r][from.c];
+  if(dest.kind==='swap'){
+    const other=board[dest.r][dest.c];
+    board[dest.r][dest.c]=piece; board[from.r][from.c]=other;
+    piece.moved=true; if(other) other.moved=true;
+  } else if(dest.kind==='stack-shield'){
+    board[dest.r][dest.c].shield=true;
+    board[from.r][from.c]=null;
+  } else if(dest.kind==='stack-win'){
+    board[dest.r][dest.c]={type:'K',color:'combined'};
+    board[from.r][from.c]=null;
+  } else {
+    board[dest.r][dest.c]=piece; board[from.r][from.c]=null;
+    piece.moved=true;
+  }
+}
+
+// Swap label depends on WHO initiated it: the knight's own move is Kneleportation; any other
+// piece's move that swaps onto a knight is Kuantum-tunneling (the same mechanic, in reverse).
+function describePlayerMove(piece, from, dest){
+  const fromSq=sq(from.r,from.c), toSq=sq(dest.r,dest.c);
+  if(dest.kind==='swap'){
+    const mech = piece.type==='N' ? 'Kneleportation' : 'Kuantum-tunneling';
+    return `${pname(piece.type)} at ${fromSq} swapped places with the piece at ${toSq} (${mech}).`;
+  }
+  if(dest.kind==='stack-shield') return `Pawn at ${fromSq} moved onto its own penny at ${toSq}, shielding it.`;
+  if(dest.kind==='stack-win') return `${pname(piece.type)} at ${fromSq} moved to ${toSq} — pennies stacked!`;
+  return `${pname(piece.type)} moved ${fromSq} → ${toSq}.`;
+}
+
+/* ---------- reaction / board-check engine ---------- */
+function findWin(board){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(p && p.type==='K' && p.color==='combined') return {r,c};
+  }
+  return null;
+}
+function findKnights(board){
+  const knights=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(p && p.type==='N') knights.push({r,c});
+  }
+  return knights;
+}
+
+// Every ray short-stops at the first piece it meets — always, including knights. What happens
+// next to that first piece is decided by the caller (normal target vs. Knortal portal-entry).
+function rayTargets(board,r,c,dirs){
+  const hits=[];
+  for(const [dr,dc] of dirs){
+    let rr=r+dr, cc=c+dc;
+    while(inBounds(rr,cc)){
+      const cell=board[rr][cc];
+      if(cell){ hits.push({r:rr,c:cc,dr,dc}); break; }
+      rr+=dr; cc+=dc;
+    }
+  }
+  return hits;
+}
+
+// 'tunnel' = Kuantum-tunneling: a NORMAL (non-knight) target's push/pull destination landing on a
+// knight swaps with it instead of being blocked. Unrelated to Knortal (which is about a ray's
+// first hit BEING a knight, not a normal target's computed destination landing on one).
+function destValid(board, mover, destR, destC){
+  if(!inBounds(destR,destC)) return false;
+  const occ=board[destR][destC];
+  if(!occ) return true;
+  if(mover.type==='K' && occ.type==='K' && occ.color!==mover.color) return 'win';
+  if(mover.type==='P' && occ.type==='K' && occ.color===mover.color && !occ.shield) return 'shield';
+  if(occ.type==='N' && mover.type!=='N') return 'tunnel';
+  return false;
+}
+function effectKind(v, baseKind){
+  if(v==='win') return 'stack-win';
+  if(v==='shield') return 'stack-shield';
+  if(v==='tunnel') return 'swap';
+  return baseKind;
+}
+
+function sq(r,c){ return 'abcdefgh'[c]+(8-r); }
+function pname(t){ return {Q:'Queen',R:'Rook',B:'Bishop',N:'Knight',P:'Pawn',K:'Penny'}[t]||t; }
+function pushEvent(type, text){ state.eventLog.push({type, text}); }
+
+/* ---------- Knortal: portal routing (Phase 0, run once per step before proposals) ---------- */
+// For every ray/pawn hit whose first target is a knight, work out which OTHER knight the force
+// exits through. 0 candidates -> no route (force fizzles). 1 -> automatic. 2+ -> a player Decision.
+async function resolvePortalRouting(board, stepNum, seenPortalSig, frozenPortalRoutes){
+  const routing=new Map();
+  const groups=[];
+  const seen=new Set();
+
+  function considerHit(sr,sc,sType,sColor,h){
+    const target=board[h.r][h.c];
+    if(!target || target.type!=='N') return;
+    if(target.color===sColor) return;
+    const routeKey=`${sr},${sc},${h.dr},${h.dc}`;
+    if(seen.has(routeKey)) return;
+    seen.add(routeKey);
+
+    const candidates=findKnights(board).filter(k=>!(k.r===h.r&&k.c===h.c));
+    if(candidates.length<=1){ routing.set(routeKey, candidates[0]||null); return; }
+
+    const sig=candidates.map(k=>k.r+','+k.c).sort().join('|');
+    if(frozenPortalRoutes.has(routeKey)){ routing.set(routeKey, candidates[0]); return; }
+    const prev=seenPortalSig.get(routeKey);
+    if(prev && prev.sig===sig && prev.count>=2){
+      frozenPortalRoutes.add(routeKey);
+      routing.set(routeKey, candidates[0]);
+      pushEvent('deadend', `Knortal routing from ${pname(sType)} at ${sq(sr,sc)} repeated 3 times — defaulting to Knight at ${sq(candidates[0].r,candidates[0].c)}.`);
+      return;
+    }
+    seenPortalSig.set(routeKey, {sig, count:(prev&&prev.sig===sig)?prev.count+1:1});
+
+    groups.push({
+      key:'portal:'+routeKey,
+      targetSq:{r:h.r,c:h.c},
+      prompt:`Force from ${pname(sType)} at ${sq(sr,sc)} enters the Knight at ${sq(h.r,h.c)} — which Knight does it exit through?`,
+      options: candidates.map(k=>({
+        label:`Exit via Knight at ${sq(k.r,k.c)}`,
+        source:{r:h.r,c:h.c},
+        target:{r:k.r,c:k.c},
+        exit:k
+      })),
+      routeKey
+    });
+  }
+
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c]; if(!p) continue;
+    if(p.type==='K'||p.type==='N') continue;
+    if(p.type==='P'){
+      const dir=p.color==='w'?-1:1;
+      for(const dc of [-1,1]){
+        const rr=r+dir, cc=c+dc; if(!inBounds(rr,cc)) continue;
+        if(board[rr][cc]) considerHit(r,c,'P',p.color,{r:rr,c:cc,dr:dir,dc});
+      }
+      continue;
+    }
+    if(p.type==='R'||p.type==='B'||p.type==='Q'){
+      const orthoHits=(p.type==='R'||p.type==='Q')?rayTargets(board,r,c,ORTHO):[];
+      const diagHits =(p.type==='B'||p.type==='Q')?rayTargets(board,r,c,DIAG):[];
+      for(const h of orthoHits) considerHit(r,c,p.type,p.color,h);
+      for(const h of diagHits) considerHit(r,c,p.type,p.color,h);
+    }
+  }
+
+  if(groups.length){
+    const picks = await resolveGroups(groups, [], false, stepNum);
+    for(const g of groups){
+      const chosen=g.options[picks[g.key]];
+      routing.set(g.routeKey, chosen.exit);
+    }
+  }
+  return routing;
+}
+
+function computeProposals(board, portalRouting){
+  const byTarget=new Map();
+  const addEffect=(tr,tc,destR,destC,kind,sr,sc,sType,label)=>{
+    const key=tr+','+tc;
+    if(!byTarget.has(key)) byTarget.set(key,[]);
+    byTarget.get(key).push({destR,destC,kind,sourceR:sr,sourceC:sc,sourceType:sType,label});
+  };
+
+  // Handles one ray/pawn hit: either a normal target, or (if the hit is a knight) routes it
+  // through the already-resolved Knortal portal map.
+  function handleHit(h, sr, sc, sType, sColor, normalDestR, normalDestC, normalLabel, normalKindBase){
+    const target=board[h.r][h.c];
+    if(target.color===sColor) return;
+
+    if(target.type==='N'){
+      const routeKey=`${sr},${sc},${h.dr},${h.dc}`;
+      const exit=portalRouting.get(routeKey);
+      if(!exit) return; // no other knight to exit through — force fizzles
+      const destR=exit.r+h.dr, destC=exit.c+h.dc;
+      const baseLabel=`Knortal: ${pname(sType)} at ${sq(sr,sc)} → Knight ${sq(h.r,h.c)} → Knight ${sq(exit.r,exit.c)}`;
+      if(!inBounds(destR,destC)) return; // exits off the board — fizzles
+      const occ=board[destR][destC];
+      if(!occ){
+        addEffect(exit.r,exit.c,destR,destC,'push',sr,sc,sType,`${baseLabel} → ${sq(destR,destC)}`);
+      } else if(occ.type!=='N'){
+        addEffect(exit.r,exit.c,destR,destC,'swap',sr,sc,sType,`${baseLabel}, collides with ${pname(occ.type)} at ${sq(destR,destC)} — swap places`);
+        addEffect(exit.r,exit.c,exit.r,exit.c,'void',sr,sc,sType,`${baseLabel} — Knight at ${sq(exit.r,exit.c)} holds its ground instead`);
+      }
+      // occ.type==='N' (a third knight): one-hop portals only in this prototype — fizzles.
+      return;
+    }
+
+    if(target.shield && sType!=='Q') return;
+    const v=destValid(board,target,normalDestR,normalDestC);
+    if(v) addEffect(h.r,h.c,normalDestR,normalDestC,effectKind(v,normalKindBase),sr,sc,sType,normalLabel);
+  }
+
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c]; if(!p) continue;
+    if(p.type==='K') continue;       // pennies: no active effect
+    if(p.type==='N') continue;       // knights: never a source — only Knortal/Kuantum-tunneling/Kneleportation move them
+    if(p.type==='P'){
+      const dir = p.color==='w' ? -1 : 1;
+      for(const dc of [-1,1]){
+        const rr=r+dir, cc=c+dc; if(!inBounds(rr,cc)) continue;
+        const t=board[rr][cc]; if(!t) continue;
+        handleHit({r:rr,c:cc,dr:dir,dc}, r,c,'P',p.color, rr+dir, cc+dc, `Pushed by pawn at ${sq(r,c)}`, 'push');
+      }
+      continue;
+    }
+    if(p.type==='R' || p.type==='B' || p.type==='Q'){
+      const orthoHits = (p.type==='R'||p.type==='Q') ? rayTargets(board,r,c,ORTHO) : [];
+      const diagHits  = (p.type==='B'||p.type==='Q') ? rayTargets(board,r,c,DIAG) : [];
+      for(const h of orthoHits) handleHit(h, r,c,p.type,p.color, h.r-h.dr, h.c-h.dc, `Pulled by ${pname(p.type)} at ${sq(r,c)}`, 'pull');
+      for(const h of diagHits)  handleHit(h, r,c,p.type,p.color, h.r+h.dr, h.c+h.dc, `Pushed by ${pname(p.type)} at ${sq(r,c)}`, 'push');
+    }
+  }
+  return byTarget;
+}
+
+function applyReactionMove(board, m){
+  const piece=board[m.tr][m.tc];
+  const fromSq=sq(m.tr,m.tc);
+  let desc;
+  if(m.kind==='void'){
+    desc=`${pname(piece.type)} at ${fromSq} holds its ground against a portaled force (${m.label}).`;
+  } else if(m.kind==='stack-win'){
+    board[m.destR][m.destC]={type:'K',color:'combined'};
+    board[m.tr][m.tc]=null;
+    desc=`${pname(piece.type)} at ${fromSq} reached ${sq(m.destR,m.destC)} — pennies stacked!`;
+  } else if(m.kind==='stack-shield'){
+    board[m.destR][m.destC].shield=true;
+    board[m.tr][m.tc]=null;
+    desc=`${pname(piece.type)} at ${fromSq} shielded the penny at ${sq(m.destR,m.destC)}.`;
+  } else if(m.kind==='swap'){
+    const other=board[m.destR][m.destC];
+    board[m.destR][m.destC]=piece; board[m.tr][m.tc]=other;
+    piece.moved=true; if(other) other.moved=true;
+    const otherName = other ? pname(other.type) : 'nothing';
+    desc=`${pname(piece.type)} at ${fromSq} swapped places with ${otherName} at ${sq(m.destR,m.destC)}.`;
+  } else {
+    board[m.destR][m.destC]=piece; board[m.tr][m.tc]=null;
+    piece.moved=true;
+    const verb = m.kind==='pull' ? 'pulled' : 'pushed';
+    desc=`${pname(piece.type)} ${verb} from ${fromSq} to ${sq(m.destR,m.destC)} (${m.label}).`;
+  }
+  state.lastReaction=desc;
+  pushEvent('reaction', desc);
+}
+
+function recordDeadEnd(r,c){
+  const msg='Net Force Zero. Force-vectors cancel out. Object in Translational Equilibrium.';
+  state.lastReaction=`${msg} (at ${sq(r,c)})`;
+  pushEvent('deadend', `${msg} — nothing moved at ${sq(r,c)}; the same conflict repeated 3 times in a row.`);
+}
+
+/* ---------- step-by-step batch resolution UI ---------- */
+// Shows every movement in the current phase (auto-determined AND ones needing a pick) at once.
+// If showApply is false: resolves as soon as every group has a pick (used for portal routing and
+// the target-conflict phase, both of which feed into a later phase). If true: always requires an
+// explicit Apply Step click, even when there's nothing to pick (used for the final phase of every step).
+function resolveGroups(groups, autoMoves, showApply, stepNum){
+  return new Promise(resolve=>{
+    if(groups.length===0 && !showApply){ resolve({}); return; }
+
+    let colorIdx=0;
+    groups.forEach(g=> g.options.forEach(o=>{ o.color=ARROW_COLORS[colorIdx % ARROW_COLORS.length]; colorIdx++; }));
+
+    const picks={};
+    function doRender(){ renderStepUI(groups, autoMoves, picks, showApply, onPick, onApply, stepNum); }
+    function onPick(key, idx){
+      picks[key]=idx;
+      if(!showApply && groups.every(g=>picks[g.key]!==undefined)){ resolve(picks); return; }
+      doRender();
+    }
+    function onApply(){ resolve(picks); }
+    doRender();
+  });
+}
+
+function renderStepUI(groups, autoMoves, picks, showApply, onPick, onApply, stepNum){
+  const allPicked = groups.every(g=>picks[g.key]!==undefined);
+
+  reactionTitleEl.textContent = stepNum<=1 ? 'REACTION: Single' : `CHAIN-REACTION: Step ${stepNum}`;
+
+  const totalItems = autoMoves.length + groups.length;
+  if(totalItems>=2){
+    reactionSubtitleEl.style.display='block';
+    reactionSubtitleEl.textContent = groups.length>=1 ? 'Simultaneous Reaction(s) + Decision(s)' : 'Simultaneous Reaction(s)';
+  } else {
+    reactionSubtitleEl.style.display='none';
+    reactionSubtitleEl.textContent='';
+  }
+
+  reactionStatus.textContent = groups.length===0
+    ? (showApply ? 'Exercise FREE WILL to steer the fate of this step.' : 'Settling…')
+    : (allPicked ? 'Exercise FREE WILL to steer the fate of this step.' : 'Mediate the following force-interactions with FREE WILL.');
+
+  reactionBody.innerHTML='';
+  const arrows=[];
+  const pendingSet=new Set();
+
+  autoMoves.forEach(m=>{
+    const row=document.createElement('div'); row.className='mini-box confirmed-row';
+    row.textContent=m.label;
+    reactionBody.appendChild(row);
+    arrows.push({from:m.source, to:m.targetSq, color:'var(--confirmed)'});
+    pendingSet.add(m.targetSq.r+','+m.targetSq.c);
+  });
+
+  groups.forEach(g=>{
+    const wrap=document.createElement('div'); wrap.className='group-block';
+    const p=document.createElement('div'); p.className='prompt'; p.textContent=g.prompt;
+    wrap.appendChild(p);
+    pendingSet.add(g.targetSq.r+','+g.targetSq.c);
+    if(picks[g.key]!==undefined){
+      const chosen=g.options[picks[g.key]];
+      const row=document.createElement('div'); row.className='mini-box confirmed-row';
+      row.textContent='✓ '+chosen.label;
+      wrap.appendChild(row);
+      const to = chosen.target || g.targetSq;
+      arrows.push({from:chosen.source, to, color:chosen.color});
+      pendingSet.add(to.r+','+to.c);
+    } else {
+      g.options.forEach((opt,idx)=>{
+        const b=document.createElement('button'); b.className='choice-btn';
+        const sw=document.createElement('span'); sw.className='swatch'; sw.style.background=opt.color;
+        const txt=document.createElement('span'); txt.textContent=opt.label;
+        b.appendChild(sw); b.appendChild(txt);
+        b.onclick=()=>onPick(g.key, idx);
+        wrap.appendChild(b);
+        const to = opt.target || g.targetSq;
+        arrows.push({from:opt.source, to, color:opt.color});
+        pendingSet.add(to.r+','+to.c);
+      });
+    }
+    reactionBody.appendChild(wrap);
+  });
+
+  if(showApply){
+    const n = autoMoves.length + groups.length;
+    const applyBtn=document.createElement('button');
+    applyBtn.className='action'; applyBtn.id='applyStepBtn';
+    applyBtn.textContent = allPicked ? `Apply Step (${n} movement${n===1?'':'s'})` : 'Resolve all forces above first';
+    applyBtn.disabled = !allPicked;
+    applyBtn.onclick = onApply;
+    reactionBody.appendChild(applyBtn);
+  }
+
+  state.pendingTargets = pendingSet;
+  render();
+  drawVectors(arrows);
+  renderSidePanel();
+}
+
+function resetReactionHeader(){
+  reactionTitleEl.textContent='Reactions';
+  reactionSubtitleEl.style.display='none';
+  reactionSubtitleEl.textContent='';
+}
+
+async function runCascade(){
+  const board=state.board;
+  let steps=0;
+  const frozenTargets=new Set(), frozenDests=new Set();
+  const seenTargetSig=new Map(), seenDestSig=new Map();
+  const seenPortalSig=new Map(), frozenPortalRoutes=new Set();
+
+  while(steps<40){
+    const stepNum = steps+1;
+
+    // Phase 0: resolve Knortal portal routing for this step's board state — which exit knight
+    // each portal-entry hit uses, before we can know what target it's actually acting on.
+    const portalRouting = await resolvePortalRouting(board, stepNum, seenPortalSig, frozenPortalRoutes);
+
+    const proposals=computeProposals(board, portalRouting);
+    for(const key of frozenTargets) proposals.delete(key);
+    if(proposals.size===0) break;
+
+    // Phase 1: every target's competing forces — auto-determined singles shown, real conflicts resolved as a batch.
+    const autoPicks={};
+    const targetGroups=[];
+    for(const [key,effects] of proposals){
+      const [tr,tc]=key.split(',').map(Number);
+      if(effects.length===1){ autoPicks[key]=effects[0]; continue; }
+      const sig=effects.map(e=>`${e.sourceR},${e.sourceC},${e.kind},${e.destR},${e.destC}`).sort().join('|');
+      const prev=seenTargetSig.get(key);
+      if(prev && prev.sig===sig && prev.count>=2){
+        frozenTargets.add(key);
+        recordDeadEnd(tr,tc);
+        continue;
+      }
+      seenTargetSig.set(key, {sig, count:(prev&&prev.sig===sig)?prev.count+1:1});
+      targetGroups.push({
+        key, targetSq:{r:tr,c:tc},
+        prompt:`Multiple forces act on the ${pname(board[tr][tc].type)} at ${sq(tr,tc)}:`,
+        options: effects.map(e=>({label:e.label, source:{r:e.sourceR,c:e.sourceC}, effect:e}))
+      });
+    }
+    const autoMovesPhase1 = Object.entries(autoPicks).map(([key,eff])=>{
+      const [tr,tc]=key.split(',').map(Number);
+      return {key, targetSq:{r:tr,c:tc}, source:{r:eff.sourceR,c:eff.sourceC},
+        label:`${pname(board[tr][tc].type)} at ${sq(tr,tc)} — ${eff.label}`};
+    });
+
+    const targetPicks = await resolveGroups(targetGroups, autoMovesPhase1, false, stepNum);
+
+    const chosen=[];
+    for(const key in autoPicks){ const [tr,tc]=key.split(',').map(Number); chosen.push({tr,tc,...autoPicks[key]}); }
+    for(const g of targetGroups){ const eff=g.options[targetPicks[g.key]].effect; chosen.push({tr:g.targetSq.r, tc:g.targetSq.c, ...eff}); }
+
+    // Phase 2: destination collisions among this step's chosen movements, then the apply gate — always shown.
+    const byDest=new Map();
+    for(const m of chosen){
+      const key=m.destR+','+m.destC;
+      if(!byDest.has(key)) byDest.set(key,[]);
+      byDest.get(key).push(m);
+    }
+    const autoFinal=[]; const destGroups=[];
+    for(const [key,ms] of byDest){
+      if(frozenDests.has(key)) continue;
+      if(ms.length===1){ autoFinal.push(ms[0]); continue; }
+      const sig=ms.map(m=>`${m.tr},${m.tc},${m.kind}`).sort().join('|');
+      const prev=seenDestSig.get(key);
+      if(prev && prev.sig===sig && prev.count>=2){
+        frozenDests.add(key);
+        const [dr,dc]=key.split(',').map(Number);
+        recordDeadEnd(dr,dc);
+        continue;
+      }
+      seenDestSig.set(key, {sig, count:(prev&&prev.sig===sig)?prev.count+1:1});
+      const [dr,dc]=key.split(',').map(Number);
+      destGroups.push({
+        key:'dest:'+key, targetSq:{r:dr,c:dc},
+        prompt:`Two pieces are both pulled/pushed toward ${sq(dr,dc)}:`,
+        options: ms.map(m=>({label:`${pname(board[m.tr][m.tc].type)} at ${sq(m.tr,m.tc)} — ${m.label}`, source:{r:m.tr,c:m.tc}, effect:m}))
+      });
+    }
+    const autoMovesPhase2 = autoFinal.map(m=>({
+      key:m.tr+','+m.tc+':'+m.destR+','+m.destC, targetSq:{r:m.destR,c:m.destC}, source:{r:m.tr,c:m.tc},
+      label:`${pname(board[m.tr][m.tc].type)} at ${sq(m.tr,m.tc)} — ${m.label}`
+    }));
+
+    const destPicks = await resolveGroups(destGroups, autoMovesPhase2, true, stepNum);
+
+    const finalMoves = autoFinal.slice();
+    for(const g of destGroups) finalMoves.push(g.options[destPicks[g.key]].effect);
+
+    for(const m of finalMoves) applyReactionMove(board, m);
+    state.pendingTargets = new Set();
+    steps++;
+    render(); drawVectors([]); renderSidePanel();
+    if(findWin(board)) return true;
+  }
+  // Cascade truly settled (or hit the cap) — clear whatever the last step's UI was showing,
+  // so no stale "Apply Step" button or arrows are left clickable once nothing is actually pending.
+  reactionBody.innerHTML='';
+  drawVectors([]);
+  resetReactionHeader();
+  if(steps>=40){
+    const msg='Cascade hit the 40-step safety cap without fully settling — stopped as a precaution.';
+    state.lastReaction=msg;
+    pushEvent('deadend', msg);
+  }
+  return !!findWin(board);
+}
+
+/* ---------- Free Play: standard chess engine (fully separate from the Pennychess
+   physics engine above — real captures, no reactions, no pennies) ---------- */
+function pnameChess(t){ return {Q:'Queen',R:'Rook',B:'Bishop',N:'Knight',P:'Pawn',K:'King'}[t]||t; }
+
+function stdSlide(board,r,c,dirs,opp,res){
+  for(const [dr,dc] of dirs){
+    let rr=r+dr, cc=c+dc;
+    while(inBounds(rr,cc)){
+      const t=board[rr][cc];
+      if(!t){ res.push({r:rr,c:cc,kind:'move'}); rr+=dr; cc+=dc; }
+      else { if(t.color===opp) res.push({r:rr,c:cc,kind:'capture'}); break; }
+    }
+  }
+}
+function stdAddPawnMove(res, tr,tc, isPromo, isCapture){
+  if(isPromo){ for(const pt of ['Q','R','B','N']) res.push({r:tr,c:tc, kind:isCapture?'promo-capture':'promo', promote:pt}); }
+  else res.push({r:tr,c:tc, kind:isCapture?'capture':'move'});
+}
+function stdKingPos(board,color){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){ const p=board[r][c]; if(p&&p.type==='K'&&p.color===color) return {r,c}; }
+  return null;
+}
+function stdSquareAttacked(board,r,c,byColor){
+  const pdir = byColor==='w' ? 1 : -1;
+  for(const dc of [-1,1]){
+    const pr=r+pdir, pc=c+dc;
+    if(inBounds(pr,pc)){ const t=board[pr][pc]; if(t&&t.type==='P'&&t.color===byColor) return true; }
+  }
+  for(const [dr,dc] of KOFF){ const rr=r+dr,cc=c+dc; if(!inBounds(rr,cc))continue; const t=board[rr][cc]; if(t&&t.type==='N'&&t.color===byColor) return true; }
+  for(const [dr,dc] of ALLD){ const rr=r+dr,cc=c+dc; if(!inBounds(rr,cc))continue; const t=board[rr][cc]; if(t&&t.type==='K'&&t.color===byColor) return true; }
+  for(const [dr,dc] of ORTHO){ let rr=r+dr,cc=c+dc; while(inBounds(rr,cc)){ const t=board[rr][cc]; if(t){ if(t.color===byColor && (t.type==='R'||t.type==='Q')) return true; break; } rr+=dr; cc+=dc; } }
+  for(const [dr,dc] of DIAG){ let rr=r+dr,cc=c+dc; while(inBounds(rr,cc)){ const t=board[rr][cc]; if(t){ if(t.color===byColor && (t.type==='B'||t.type==='Q')) return true; break; } rr+=dr; cc+=dc; } }
+  return false;
+}
+function stdInCheck(board,color){
+  const kp=stdKingPos(board,color); if(!kp) return false;
+  return stdSquareAttacked(board, kp.r, kp.c, color==='w'?'b':'w');
+}
+function stdPseudoMoves(board, r, c, chess){
+  const piece=board[r][c]; if(!piece) return [];
+  const color=piece.color, opp=color==='w'?'b':'w', res=[];
+  switch(piece.type){
+    case 'P': {
+      const dir=color==='w'?-1:1, startRow=color==='w'?6:1, promoRow=color==='w'?0:7;
+      const oneR=r+dir;
+      if(inBounds(oneR,c) && !board[oneR][c]){
+        stdAddPawnMove(res, oneR,c, oneR===promoRow, false);
+        if(r===startRow){
+          const twoR=r+2*dir;
+          if(!board[twoR][c]) res.push({r:twoR,c,kind:'double'});
+        }
+      }
+      for(const dc of [-1,1]){
+        const cr=r+dir, cc=c+dc; if(!inBounds(cr,cc)) continue;
+        const t=board[cr][cc];
+        if(t && t.color===opp) stdAddPawnMove(res, cr,cc, cr===promoRow, true);
+        else if(chess.enPassant && chess.enPassant.r===cr && chess.enPassant.c===cc) res.push({r:cr,c:cc,kind:'enpassant'});
+      }
+      break;
+    }
+    case 'N':
+      for(const [dr,dc] of KOFF){ const rr=r+dr,cc=c+dc; if(!inBounds(rr,cc))continue; const t=board[rr][cc]; if(!t||t.color===opp) res.push({r:rr,c:cc,kind:t?'capture':'move'}); }
+      break;
+    case 'B': stdSlide(board,r,c,DIAG,opp,res); break;
+    case 'R': stdSlide(board,r,c,ORTHO,opp,res); break;
+    case 'Q': stdSlide(board,r,c,ALLD,opp,res); break;
+    case 'K': {
+      for(const [dr,dc] of ALLD){ const rr=r+dr,cc=c+dc; if(!inBounds(rr,cc))continue; const t=board[rr][cc]; if(!t||t.color===opp) res.push({r:rr,c:cc,kind:t?'capture':'move'}); }
+      if(!piece.moved && !stdInCheck(board,color)){
+        const row=color==='w'?7:0;
+        if(chess.castling[color+'K'] && !board[row][5] && !board[row][6]
+           && board[row][7] && board[row][7].type==='R' && board[row][7].color===color && !board[row][7].moved
+           && !stdSquareAttacked(board,row,5,opp) && !stdSquareAttacked(board,row,6,opp)){
+          res.push({r:row,c:6,kind:'castle-k'});
+        }
+        if(chess.castling[color+'Q'] && !board[row][1] && !board[row][2] && !board[row][3]
+           && board[row][0] && board[row][0].type==='R' && board[row][0].color===color && !board[row][0].moved
+           && !stdSquareAttacked(board,row,3,opp) && !stdSquareAttacked(board,row,2,opp)){
+          res.push({r:row,c:2,kind:'castle-q'});
+        }
+      }
+      break;
+    }
+  }
+  return res;
+}
+function stdApplyMoveSim(board, chess, from, to, move){
+  const piece=board[from.r][from.c];
+  const color=piece.color;
+  const captured=board[to.r][to.c];
+  if(move.kind==='enpassant') board[from.r][to.c]=null;
+  if(captured && captured.type==='R'){
+    const homeRow=captured.color==='w'?7:0;
+    if(to.r===homeRow && to.c===0) chess.castling[captured.color+'Q']=false;
+    if(to.r===homeRow && to.c===7) chess.castling[captured.color+'K']=false;
+  }
+  if(move.kind==='castle-k' || move.kind==='castle-q'){
+    const row=from.r;
+    if(move.kind==='castle-k'){ board[row][5]=board[row][7]; board[row][7]=null; if(board[row][5]) board[row][5].moved=true; }
+    else { board[row][3]=board[row][0]; board[row][0]=null; if(board[row][3]) board[row][3].moved=true; }
+  }
+  board[to.r][to.c]=piece;
+  board[from.r][from.c]=null;
+  piece.moved=true;
+  if(move.promote) piece.type=move.promote;
+  chess.enPassant = move.kind==='double' ? {r:(from.r+to.r)/2, c:from.c} : null;
+  if(piece.type==='K'){ chess.castling[color+'K']=false; chess.castling[color+'Q']=false; }
+  if(piece.type==='R'){
+    const homeRow=color==='w'?7:0;
+    if(from.r===homeRow && from.c===0) chess.castling[color+'Q']=false;
+    if(from.r===homeRow && from.c===7) chess.castling[color+'K']=false;
+  }
+}
+function stdLegalMoves(board, r, c, chess){
+  const piece=board[r][c]; if(!piece) return [];
+  const pseudo=stdPseudoMoves(board,r,c,chess);
+  const legal=[];
+  for(const m of pseudo){
+    const b2=clone(board), chess2=JSON.parse(JSON.stringify(chess));
+    stdApplyMoveSim(b2, chess2, {r,c}, {r:m.r,c:m.c}, m);
+    if(!stdInCheck(b2, piece.color)) legal.push(m);
+  }
+  return legal;
+}
+function stdHasAnyLegalMove(board, chess, color){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(p && p.color===color && stdLegalMoves(board,r,c,chess).length) return true;
+  }
+  return false;
+}
+function stdGameStatus(board, chess){
+  const color=chess.turn;
+  const inCheck=stdInCheck(board,color);
+  const hasMove=stdHasAnyLegalMove(board,chess,color);
+  if(!hasMove) return inCheck?'checkmate':'stalemate';
+  return inCheck?'check':'normal';
+}
+function describeChessMove(piece, from, to, move, captured){
+  const fromSq=sq(from.r,from.c), toSq=sq(to.r,to.c);
+  const colorName=piece.color==='w'?'White':'Black';
+  if(move.kind==='castle-k') return `${colorName} castled kingside.`;
+  if(move.kind==='castle-q') return `${colorName} castled queenside.`;
+  const isCapture = !!captured || move.kind==='enpassant';
+  let base=`${colorName} ${pnameChess(piece.type)} ${isCapture?'captures on':'to'} ${toSq} (from ${fromSq})`;
+  if(move.kind==='enpassant') base+=' en passant';
+  if(move.promote) base+=`, promoting to ${pnameChess(move.promote)}`;
+  return base+'.';
+}
+function pickPromotion(color){
+  return new Promise(resolve=>{
+    reactionStatus.textContent='Choose a piece to promote to:';
+    reactionBody.innerHTML='';
+    ['Q','R','B','N'].forEach(pt=>{
+      const b=document.createElement('button'); b.className='choice-btn';
+      b.textContent = (color==='w'?'White ':'Black ')+pnameChess(pt);
+      b.onclick=()=>resolve(pt);
+      reactionBody.appendChild(b);
+    });
+  });
+}
+function showChessEnd(status, winner){
+  state.chessOver=true;
+  if(status==='checkmate'){
+    winTitleEl.textContent='Checkmate!';
+    winDetail.textContent=`${winner} wins by checkmate, in ${state.moveCount} ply.`;
+  } else {
+    winTitleEl.textContent='Stalemate';
+    winDetail.textContent=`Draw by stalemate, after ${state.moveCount} ply.`;
+  }
+  winEl.classList.add('show');
+}
+async function performChessMove(from, move){
+  const piece=state.board[from.r][from.c];
+  let promoteType=move.promote;
+  if(move.kind==='promo' || move.kind==='promo-capture'){
+    reactionBody.innerHTML='';
+    promoteType=await pickPromotion(piece.color);
+  }
+  const finalMove={...move, promote:promoteType};
+  const captured = state.board[move.r][move.c] || (move.kind==='enpassant' ? state.board[from.r][move.c] : null);
+  state.history.push({board:clone(state.board), moveCount:state.moveCount, chess:JSON.parse(JSON.stringify(state.chess))});
+  const desc=describeChessMove(piece, from, {r:move.r,c:move.c}, finalMove, captured);
+  stdApplyMoveSim(state.board, state.chess, from, {r:move.r,c:move.c}, finalMove);
+  state.moveCount++;
+  moveCountEl.textContent=state.moveCount;
+  state.chess.turn = state.chess.turn==='w' ? 'b' : 'w';
+  state.lastMove=desc;
+  state.lastReaction='—';
+  pushEvent('move', desc);
+  reactionBody.innerHTML='';
+  render();
+  renderSidePanel();
+  const status=stdGameStatus(state.board, state.chess);
+  const toMoveName = state.chess.turn==='w' ? 'White' : 'Black';
+  if(status==='checkmate'){
+    const winner = toMoveName==='White' ? 'Black' : 'White';
+    reactionStatus.textContent=`Checkmate — ${winner} wins.`;
+    pushEvent('deadend', `Checkmate — ${winner} wins.`);
+    showChessEnd('checkmate', winner);
+  } else if(status==='stalemate'){
+    reactionStatus.textContent='Stalemate — draw.';
+    pushEvent('deadend', 'Stalemate — draw.');
+    showChessEnd('stalemate');
+  } else if(status==='check'){
+    reactionStatus.textContent=`${toMoveName} to move — in check.`;
+  } else {
+    reactionStatus.textContent=`${toMoveName} to move.`;
+  }
+  renderSidePanel();
+}
+async function onChessSquareClick(r,c){
+  if(state.busy || state.chessOver) return;
+  const piece=state.board[r][c];
+  if(state.selected){
+    const dest=state.legal.find(m=>m.r===r&&m.c===c);
+    if(dest){
+      const from=state.selected;
+      state.selected=null; state.legal=[];
+      await performChessMove(from, dest);
+      render();
+      return;
+    }
+    if(piece && piece.color===state.chess.turn){
+      state.selected={r,c};
+      state.legal=stdLegalMoves(state.board, r,c, state.chess);
+    } else { state.selected=null; state.legal=[]; }
+    render();
+    return;
+  }
+  if(piece && piece.color===state.chess.turn){
+    state.selected={r,c};
+    state.legal=stdLegalMoves(state.board, r,c, state.chess);
+    render();
+  }
+}
+
+/* ---------- UI ---------- */
+const boardOuterEl=document.getElementById('boardOuter');
+const levelListEl=document.getElementById('level-list');
+const msgEl=document.getElementById('msg');
+const moveCountEl=document.getElementById('moveCount');
+const moveMinEl=document.getElementById('moveMin');
+const levelNameEl=document.getElementById('levelName');
+const levelDescEl=document.getElementById('levelDesc');
+const winEl=document.getElementById('win');
+const winTitleEl=document.getElementById('winTitle');
+const winDetail=document.getElementById('winDetail');
+const reactionTitleEl=document.getElementById('reactionTitle');
+const reactionSubtitleEl=document.getElementById('reactionSubtitle');
+const reactionStatus=document.getElementById('reactionStatus');
+const reactionBody=document.getElementById('reactionBody');
+const sideExtraEl=document.getElementById('sideExtra');
+
+const ARROW_COLORS=['#5aa7d6','#d9a441','#c1594a','#b47ee0','#4fd0c6','#e8a33d'];
+
+let state={ board:null, level:null, selected:null, legal:[], moveCount:0, history:[], busy:false, won:false,
+  pendingTargets:new Set(), lastReaction:'', lastMove:'', eventLog:[], mode:'pennychess', chess:null, chessOver:false };
+
+// Last Reaction, Last Action/Move, and the full History are always visible together —
+// during idle turns between moves, and mid-reaction alike.
+function renderSidePanel(){
+  sideExtraEl.innerHTML=`
+    <h3 class="sub-title">Last Reaction</h3>
+    <div class="mini-box">${escapeHtml(state.lastReaction||'—')}</div>
+    <h3 class="sub-title">Last Action/Move</h3>
+    <div class="mini-box">${escapeHtml(state.lastMove||'—')}</div>
+    <h3 class="sub-title">Actions + Reactions History</h3>
+    <div class="history-box" id="historyBox"></div>
+  `;
+  const hb=document.getElementById('historyBox');
+  hb.innerHTML = state.eventLog.length
+    ? state.eventLog.map(e=>`<div class="hist-entry hist-${e.type}">${escapeHtml(e.text)}</div>`).join('')
+    : `<div class="hist-entry">Nothing yet.</div>`;
+  hb.scrollTop = hb.scrollHeight;
+}
+
+function drawVectors(arrows){
+  const NS='http://www.w3.org/2000/svg';
+  let svg=document.getElementById('vectorLayer');
+  if(svg) svg.remove();
+  svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('id','vectorLayer');
+  svg.setAttribute('viewBox','0 0 480 480');
+
+  const defs=document.createElementNS(NS,'defs');
+  const resolvedColor = c => c.startsWith('var(') ? getComputedStyle(document.documentElement).getPropertyValue(c.slice(4,-1)).trim() : c;
+  const colorId = c => 'c'+c.replace(/[^a-zA-Z0-9]/g,'');
+  const usedColors=[...new Set(arrows.map(a=>a.color))];
+  usedColors.forEach(color=>{
+    const rc=resolvedColor(color);
+    const marker=document.createElementNS(NS,'marker');
+    marker.setAttribute('id','arrowhead-'+colorId(color));
+    marker.setAttribute('markerWidth','8'); marker.setAttribute('markerHeight','8');
+    marker.setAttribute('refX','6'); marker.setAttribute('refY','3');
+    marker.setAttribute('orient','auto');
+    const path=document.createElementNS(NS,'path');
+    path.setAttribute('d','M0,0 L6,3 L0,6 Z');
+    path.setAttribute('fill',rc);
+    marker.appendChild(path);
+    defs.appendChild(marker);
+  });
+  svg.appendChild(defs);
+
+  const center=(r,c)=>({x:c*60+30, y:r*60+30});
+  arrows.forEach(a=>{
+    const from=center(a.from.r,a.from.c), to=center(a.to.r,a.to.c);
+    const dx=to.x-from.x, dy=to.y-from.y, len=Math.hypot(dx,dy)||1;
+    const ux=dx/len, uy=dy/len;
+    const startX=from.x+ux*20, startY=from.y+uy*20;
+    const endX=to.x-ux*24, endY=to.y-uy*24;
+    const rc=resolvedColor(a.color);
+    const line=document.createElementNS(NS,'line');
+    line.setAttribute('x1',startX); line.setAttribute('y1',startY);
+    line.setAttribute('x2',endX); line.setAttribute('y2',endY);
+    line.setAttribute('stroke',rc);
+    line.setAttribute('stroke-width','4');
+    line.setAttribute('stroke-linecap','round');
+    line.setAttribute('marker-end','url(#arrowhead-'+colorId(a.color)+')');
+    line.setAttribute('opacity','0.9');
+    svg.appendChild(line);
+  });
+
+  boardOuterEl.appendChild(svg);
+}
+
+function buildLevelList(){
+  const groups=['Free Play','Pre-Tutorial','Tutorial','Bonus','Not Implemented'];
+  levelListEl.innerHTML='';
+  for(const g of groups){
+    const items=LEVELS.filter(l=>l.group===g);
+    if(!items.length) continue;
+    const label=document.createElement('div');
+    label.className='group-label'; label.textContent=g;
+    levelListEl.appendChild(label);
+    for(const lvl of items){
+      const btn=document.createElement('button');
+      btn.className='lvl-btn'+(lvl.locked?' locked':'');
+      btn.innerHTML=`${lvl.name}<small>${lvl.locked?'Not implemented in this prototype':(lvl.standard?'Free play — no move-minimum, no physics':('Move-minimum: '+lvl.min))}</small>`;
+      btn.dataset.id=lvl.id;
+      if(!lvl.locked) btn.onclick=()=>loadLevel(lvl.id);
+      levelListEl.appendChild(btn);
+    }
+  }
+}
+
+async function loadLevel(id){
+  const lvl=LEVELS.find(l=>l.id===id);
+  if(!lvl || lvl.locked) return;
+  state.level=lvl;
+  state.mode = lvl.standard ? 'chess' : 'pennychess';
+  state.board=lvl.setup();
+  state.selected=null; state.legal=[]; state.moveCount=0; state.history=[]; state.won=false; state.busy=true;
+  state.chessOver=false;
+  state.chess = lvl.standard ? {turn:'w', castling:{wK:true,wQ:true,bK:true,bQ:true}, enPassant:null} : null;
+  state.lastReaction=''; state.lastMove=''; state.eventLog=[]; state.pendingTargets=new Set();
+  document.querySelectorAll('.lvl-btn').forEach(b=>b.classList.toggle('active', b.dataset.id===id));
+  levelNameEl.textContent=lvl.name;
+  moveMinEl.textContent = (lvl.min==null) ? '—' : lvl.min;
+  moveCountEl.textContent='0';
+  levelDescEl.textContent=lvl.desc||'';
+  reactionBody.innerHTML='';
+  resetReactionHeader();
+  winEl.classList.remove('show');
+  if(lvl.standard){
+    state.busy=false;
+    msgEl.textContent='Ready.';
+    reactionStatus.textContent='White to move.';
+    render();
+    drawVectors([]);
+    renderSidePanel();
+    return;
+  }
+  msgEl.textContent='Running initial board-check…';
+  reactionStatus.textContent='Settling initial position…';
+  render();
+  drawVectors([]);
+  renderSidePanel();
+  const won=await runCascade();
+  state.busy=false;
+  msgEl.textContent = won ? '' : 'Ready.';
+  reactionStatus.textContent = won ? 'Solved during setup.' : 'Ready. Make a move.';
+  render();
+  renderSidePanel();
+  if(won) showWin();
+}
+
+function render(){
+  boardOuterEl.innerHTML='';
+  const files='abcdefgh';
+  boardOuterEl.appendChild(blankLabel());
+  for(let c=0;c<8;c++) boardOuterEl.appendChild(fileLabel(files[c]));
+  boardOuterEl.appendChild(blankLabel());
+
+  for(let r=0;r<8;r++){
+    boardOuterEl.appendChild(rankLabel(8-r));
+    for(let c=0;c<8;c++){
+      const sqEl=document.createElement('div');
+      sqEl.className='sq '+(((r+c)%2===0)?'light':'dark');
+      sqEl.dataset.r=r; sqEl.dataset.c=c;
+      if(state.selected && state.selected.r===r && state.selected.c===c) sqEl.classList.add('selected');
+      if(state.pendingTargets && state.pendingTargets.has(r+','+c)) sqEl.classList.add('pending');
+      const legalHere=state.legal.find(m=>m.r===r&&m.c===c);
+      if(legalHere){ sqEl.classList.add('legal'); if(state.board[r][c]) sqEl.classList.add('occupied'); }
+      const piece=state.board[r][c];
+      if(piece) sqEl.appendChild(renderPiece(piece));
+      sqEl.onclick=()=>onSquareClick(r,c);
+      boardOuterEl.appendChild(sqEl);
+    }
+    boardOuterEl.appendChild(rankLabel(8-r));
+  }
+
+  boardOuterEl.appendChild(blankLabel());
+  for(let c=0;c<8;c++) boardOuterEl.appendChild(fileLabel(files[c]));
+  boardOuterEl.appendChild(blankLabel());
+}
+function blankLabel(){ const d=document.createElement('div'); d.className='glabel'; return d; }
+function fileLabel(ch){ const d=document.createElement('div'); d.className='glabel'; d.textContent=ch; return d; }
+function rankLabel(n){ const d=document.createElement('div'); d.className='glabel'; d.textContent=n; return d; }
+
+function renderPiece(p){
+  if(p.type==='K' && state.mode!=='chess'){
+    const d=document.createElement('div');
+    d.className='penny '+(p.color==='combined'?'combined':p.color);
+    d.textContent = p.color==='combined' ? '★' : (p.color==='w'?'H':'T');
+    if(p.shield){ const s=document.createElement('div'); s.className='shield'; s.textContent='P'; d.appendChild(s); }
+    return d;
+  }
+  const glyphs={
+    w:{Q:'♕',R:'♖',B:'♗',N:'♘',P:'♙',K:'♔'},
+    b:{Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',K:'♚'}
+  };
+  const d=document.createElement('div');
+  d.className='pc '+p.color;
+  d.textContent=glyphs[p.color][p.type];
+  return d;
+}
+
+function onSquareClick(r,c){
+  if(state.mode==='chess') return onChessSquareClick(r,c);
+  return onPennychessSquareClick(r,c);
+}
+
+async function onPennychessSquareClick(r,c){
+  if(state.busy||state.won) return;
+  const piece=state.board[r][c];
+
+  if(state.selected){
+    const dest=state.legal.find(m=>m.r===r&&m.c===c);
+    if(dest){
+      const movedPiece=state.board[state.selected.r][state.selected.c];
+      const moveDesc=describePlayerMove(movedPiece, state.selected, dest);
+      state.lastMove=moveDesc;
+      pushEvent('move', moveDesc);
+
+      state.history.push({board:clone(state.board), moveCount:state.moveCount});
+      applyPlayerMove(state.board, state.selected, dest);
+      state.moveCount++;
+      moveCountEl.textContent=state.moveCount;
+      state.selected=null; state.legal=[];
+      if(dest.kind==='stack-win'){ render(); renderSidePanel(); showWin(); return; }
+      state.busy=true; msgEl.textContent='Resolving reactions…';
+      reactionStatus.textContent='Resolving reactions…';
+      render(); renderSidePanel();
+      const won=await runCascade();
+      state.busy=false;
+      msgEl.textContent = won ? '' : 'Board is clean.';
+      reactionStatus.textContent = won ? 'Solved.' : 'Ready. Make a move.';
+      render(); renderSidePanel();
+      if(won) showWin();
+      return;
+    }
+    if(piece && piece.color==='w'){
+      state.selected={r,c}; state.legal=legalDestinations(state.board,r,c);
+    } else { state.selected=null; state.legal=[]; }
+    render();
+    return;
+  }
+
+  if(piece && piece.color==='w'){
+    state.selected={r,c};
+    state.legal=legalDestinations(state.board,r,c);
+    render();
+  }
+}
+
+function showWin(){
+  state.won=true;
+  const par=state.level.min;
+  let title, cmp;
+  if(state.moveCount<par){
+    title='NEW RECORD!';
+    cmp=`${par-state.moveCount} move(s) under the ${par}-move minimum!`;
+  } else if(state.moveCount===par){
+    title='Perfect Solve!';
+    cmp=`Exactly the ${par}-move minimum.`;
+  } else {
+    title='Solved!';
+    cmp=`${state.moveCount-par} move(s) over the ${par}-move minimum. Still solved.`;
+  }
+  winTitleEl.textContent=title;
+  winDetail.textContent = `${state.level.name} — solved in ${state.moveCount} move(s). ${cmp}`;
+  winEl.classList.add('show');
+}
+document.getElementById('winClose').onclick=()=>winEl.classList.remove('show');
+
+document.getElementById('undoBtn').onclick=()=>{
+  if(state.busy || !state.history.length) return;
+  const prev=state.history.pop();
+  state.board=prev.board; state.moveCount=prev.moveCount;
+  state.selected=null; state.legal=[]; state.won=false; state.pendingTargets=new Set();
+  moveCountEl.textContent=state.moveCount;
+  msgEl.textContent='Undone.';
+  reactionBody.innerHTML='';
+  resetReactionHeader();
+  if(state.mode==='chess'){
+    state.chess=prev.chess; state.chessOver=false;
+    winEl.classList.remove('show');
+    reactionStatus.textContent=`${state.chess.turn==='w'?'White':'Black'} to move.`;
+  } else {
+    reactionStatus.textContent='Ready. Make a move.';
+  }
+  pushEvent('undo', `Undo — reverted to move ${state.moveCount}.`);
+  render();
+  renderSidePanel();
+};
+document.getElementById('resetBtn').onclick=()=>{ if(!state.busy && state.level) loadLevel(state.level.id); };
+
+/* ---------- piece cheat-sheet table ---------- */
+function buildPieceTable(){
+  const rows=[
+    {glyph:'♕/♛', name:'Queen', move:'Any straight line, unobstructed — but if the first piece in the way is a knight, landing on it (swapping places) is offered as an extra option.',
+      effect:'On its straight lines and diagonals alike: affects the first opposing piece it meets, 1 square displaced. Ignores shields. Stops at the first piece either way — never reaches past it. If that first piece is a knight, see Knortal.'},
+    {glyph:'♖/♜', name:'Rook', move:'Straight lines only (rows/columns), unobstructed — with the same optional knight-swap landing.',
+      effect:'Affects the first opposing piece in its line, 1 square displaced. Stops there — never reaches past it. If that first piece is a knight, see Knortal.'},
+    {glyph:'♗/♝', name:'Bishop', move:'Diagonals only, unobstructed — with the same optional knight-swap landing.',
+      effect:'Affects the first opposing piece on its diagonal, 1 square displaced. Stops there — never reaches past it. If that first piece is a knight, see Knortal.'},
+    {glyph:'♘/♞', name:'Knight', move:'Standard L-shape. Landing on any occupied square swaps places with whatever is there (Kneleportation).',
+      effect:'A force that reaches a knight doesn\'t affect it directly — it\'s transmitted through, like a portal, to a DIFFERENT knight elsewhere on the board (your choice if 2+ exist), direction conserved (Knortal). It\'s that exit knight that actually gets displaced — moving into an empty square automatically, or (if occupied) your choice to collide-and-swap or hold its ground. With no other knight on the board, the force has nowhere to go. Separately, any other piece\'s move that reaches a knight\'s square swaps places with it instead of being blocked (Kuantum-tunneling), automatically during a reaction or optionally on your own move.'},
+    {glyph:'♙/♟', name:'Pawn', move:'1 square forward; 2 squares forward on that pawn\'s first move only (both squares must be empty, or a knight may occupy either and be swapped with instead). Can move onto its own penny to "shield" it.',
+      effect:'Affects an opposing piece diagonally in front, 1 square displaced. No effect on same-color pieces. If that piece is a knight, see Knortal.'},
+    {glyph:'🪙', name:'Penny (King)', move:'1 square, any direction. Moving onto the opposing penny wins. Moving onto an adjacent knight swaps places with it.',
+      effect:'None — the penny never pushes, pulls, or swaps anything. It can still be displaced by others unless shielded (and knights don\'t affect it directly at all — see Knortal).'},
+  ];
+  const table=document.getElementById('pieceTable');
+  table.innerHTML=`<tr><th></th><th>Piece</th><th>Movement</th><th>Force effect on opposing pieces</th></tr>`+
+    rows.map(r=>`<tr><td class="glyphcell">${r.glyph}</td><td><b>${r.name}</b></td><td>${r.move}</td><td>${r.effect}</td></tr>`).join('');
+}
+
+/* ---------- Full Rule Set & FAQs ---------- */
+function buildFullRuleSet(){
+  document.getElementById('fullRuleSet').innerHTML = `
+    <h4>The goal</h4>
+    <p>Get the two "pennies" — the piece that replaces each side's King — to
+    land on the same square. That's the entire win condition. Nothing is ever
+    captured, in this game or in general: pieces only move, swap places, or
+    "stack" on top of a penny.</p>
+
+    <h4>Whose turn is it</h4>
+    <p>You move only your own (white / "heads") pieces. The opposing
+    ("tails") side never takes a turn of its own — it only reacts, when one
+    of its pieces gets pushed, pulled, or swapped by something in range.</p>
+
+    <h4>How pieces move (no captures, ever)</h4>
+    <ul>
+      <li><b>Queen / Rook / Bishop:</b> slide any distance in their normal
+        directions, but only onto an empty square — a piece in the way stops
+        the slide, it doesn't get captured. If that blocking piece is a
+        knight, landing on it (swapping places, Kuantum-tunneling) is
+        offered as an extra option alongside the normal stop-short squares.</li>
+      <li><b>Knight:</b> standard L-shape. If the landing square is occupied
+        by anything, the knight swaps places with it instead of being
+        blocked — this is <b>Kneleportation</b>.</li>
+      <li><b>Pawn:</b> 1 square forward. On that specific pawn's very first
+        move only, it may instead go 2 squares forward, same as real chess
+        — but only if both squares ahead are empty, or (as of v8) either
+        square holds a knight, which can be swapped into instead. A pawn can
+        also move onto its own penny to "shield" it (see below), or onto a
+        knight directly ahead of it to swap places.</li>
+      <li><b>Penny (King):</b> 1 square in any direction. Moving onto the
+        opposing penny's square wins immediately. Moving onto an adjacent
+        knight swaps places with it instead.</li>
+    </ul>
+
+    <h4>Short-stop: how far a force reaches</h4>
+    <p>A Rook, Bishop, or Queen's force always stops at the very first piece
+    it meets in its line, knights included — that's the only piece this step
+    is even in range of that direction. What happens next depends on what
+    that piece is: for anything except a knight, it's affected directly
+    (see below). For a knight, the force doesn't stop there in the usual
+    sense — it's redirected through Knortal instead.</p>
+
+    <h4>Knortal: knights are portals for forces</h4>
+    <p>When a force's first hit is a knight, that knight is never affected
+    directly. Instead the force is transmitted through it, like a portal,
+    and comes out of a <i>different</i> knight elsewhere on the board — with
+    its direction of travel conserved. It's that <b>exit</b> knight that
+    actually gets displaced, 1 square further along the same direction the
+    force was already traveling when it entered the first knight:</p>
+    <ul>
+      <li>If there's exactly <b>one</b> other knight on the board, it's
+        automatically the exit.</li>
+      <li>If there are <b>two or more</b> other knights, you choose which
+        one the force exits through.</li>
+      <li>If there's <b>no</b> other knight, the force has nowhere to exit
+        and simply fizzles — nothing happens.</li>
+      <li>If the exit knight's destination square is <b>empty</b>, it just
+        moves there.</li>
+      <li>If that destination is <b>occupied</b> by something else, you
+        choose: let the exit knight collide and swap places with whatever's
+        there, or have it hold its ground and not move at all.</li>
+    </ul>
+    <p>The knight the force first reached (the entry point) never moves —
+    it's a fixed conduit, not a target. Note this is about <i>forces</i>
+    during reactions specifically — a piece's own <i>move</i> still can't
+    slide past a knight to reach a square beyond it; it can only optionally
+    land on the knight itself (Kuantum-tunneling, below), right where the
+    slide would otherwise stop.</p>
+
+    <h4>The board-check: what happens after you move</h4>
+    <p>Every move you make is followed automatically by a "board-check": the
+    engine looks at every piece's line of influence and works out what force,
+    if any, it exerts (including working out any Knortal routing). Everything
+    that could happen in this "step" is shown to you at once — with an arrow
+    for every single movement, even the ones with only one possible outcome
+    — before any of it actually happens. Once every genuine choice in the
+    step has been made, you click <b>Apply Step</b> and everything in it
+    happens together, simultaneously. The board is then checked again for a
+    new step, and this repeats — a single move can trigger a whole chain of
+    steps — until a full check finds nothing left to resolve. The very first
+    board-check of a level runs before you've made any move at all, on the
+    starting position itself.</p>
+    <p>The Reactions panel title tells you where you are: <b>REACTION:
+    Single</b> means this is (so far) the only step this move has triggered;
+    <b>CHAIN-REACTION: Step N</b> means a second (or third, etc.) step has
+    followed. It's a running count of steps taken, not a prediction of how
+    many are left — that isn't knowable in advance, since later steps can
+    depend on choices you haven't made yet.</p>
+
+    <h4>Reactions vs. Decisions</h4>
+    <p>Every resolved force is a <b>Reaction</b>. Some Reactions only have
+    one possible outcome — nothing to pick, just something happening. A
+    <b>Decision</b> is specifically a Reaction where more than one outcome
+    was possible and you had to choose — including which knight a Knortal
+    force exits through, and whether an exit knight collides or holds still.
+    When 2 or more Reactions happen in the same step, an italic subtitle
+    reads <i>Simultaneous Reaction(s)</i>; if any of those are Decisions, it
+    reads <i>Simultaneous Reaction(s) + Decision(s)</i> instead — so you
+    always know at a glance whether a step is doing several things at once,
+    and whether any of them needed your input.</p>
+
+    <h4>Force effects — what each piece does to pieces in its range</h4>
+    <ul>
+      <li><b>Rook, Bishop, Queen:</b> each affects the first opposing piece
+        in its line/diagonal, displacing it 1 square (Rook and Queen's
+        straight lines pull it closer; Bishop and Queen's diagonals push it
+        away). Shields block all of these except from a Queen. If that first
+        piece is a knight, see Knortal instead.</li>
+      <li><b>Pawn:</b> pushes an opposing piece 1 square further away if
+        it's diagonally in front of the pawn. No effect on same-color
+        pieces. If that piece is a knight, see Knortal instead.</li>
+      <li><b>Penny:</b> no effect on anything — it's purely the goal object.</li>
+      <li><b>Knight:</b> never a direct target of the above, and never a
+        source of its own force — see Knortal for what happens when a force
+        reaches one, and Kneleportation/Kuantum-tunneling below for how
+        knights participate in ordinary movement.</li>
+    </ul>
+    <p>Same-color pieces never affect each other with these forces — only
+    opposing pieces. A push or pull that would send a piece off the board,
+    or into a square already occupied by something it can't stack or
+    tunnel with, simply doesn't happen that step.</p>
+
+    <h4>Kuantum-tunneling and Kneleportation</h4>
+    <p>These are the same underlying swap mechanic, mirrored. <b>Kneleportation</b>
+    is a knight's own move onto any occupied square — it swaps places with
+    whatever's there. <b>Kuantum-tunneling</b> is the reverse: any other
+    piece's move or push/pull destination that lands exactly on a knight's
+    square swaps places with it instead of being blocked — this can happen
+    automatically during a reaction (a normal, non-knight target gets pushed
+    or pulled and its destination happens to be a knight), or as an optional
+    destination you choose on your own move.</p>
+
+    <h4>Shielding</h4>
+    <p>Move one of your own pawns onto your own penny, and it "shields" the
+    penny: from then on, every force except one from an opposing Queen has
+    no effect on it. A shield lasts for the rest of the level.</p>
+
+    <h4>When forces conflict</h4>
+    <p>If two or more forces would act on the same piece at once, or two
+    different pieces would both end up on the same square, you're shown
+    colored arrows for every candidate and pick which one actually happens
+    — this is decided before the step applies, alongside every other
+    movement in that step. If the exact same conflict would come up a 4th
+    time in a row with nothing having changed, the game stops asking: it
+    treats the forces as canceling out ("Net Force Zero... Translational
+    Equilibrium") and moves on. (A Knortal routing choice that repeats 3
+    times the same way defaults to its first candidate rather than asking
+    a 4th time, the same idea applied to portal routing.)</p>
+
+    <h4>Levels</h4>
+    <p>Each level is a different starting position with its own listed
+    "move-minimum" — the fewest player moves a solve is believed to need.
+    Solving in exactly that many moves is a "Perfect Solve." Solving in
+    fewer is a "New Record" — the listed minimum is the designer's best
+    estimate, not a guarantee, so it's possible to beat it. Solving in more
+    moves still counts as solved.</p>
+
+    <h4>Free Play — Standard Chess</h4>
+    <p>The top entry in the level list is not a Pennychess puzzle at all —
+    it's an ordinary chessboard with ordinary chess rules (real captures,
+    check, checkmate, castling, en passant, promotion) and none of the
+    physics above. There's no move-minimum, no reactions, and no pennies.
+    Either side can be moved on its turn, so it works alone or as a
+    pass-and-play game shared with someone else at the same computer.</p>
+  `;
+}
+
+function buildFAQs(){
+  const qas=[
+    ["Why can't I capture the other side's pieces?", "Pennychess never removes a piece from the board. Every interaction is a push, a pull, or a swap — the whole puzzle is about maneuvering pieces into position, not eliminating them."],
+    ["I moved a piece and nothing else happened. Is that a bug?", "No — most moves don't trigger any reaction at all. A push or pull only happens when a piece ends up with something in its actual line of effect. A quiet board-check is normal."],
+    ["Why did a force only affect the closest piece, not the one behind it too?", "Every Rook/Bishop/Queen force short-stops at the very first piece it reaches — that piece alone is affected, and the force never reaches past it this step. If that first piece is a knight, the force is routed through Knortal instead of stopping there normally."],
+    ["What is Knortal, exactly?", "Knights act as portals. A force that reaches a knight doesn't affect that knight — it's transmitted through to a DIFFERENT knight elsewhere on the board, with its direction conserved, and it's that exit knight that actually moves. With one other knight, it's automatic; with two or more, you choose which one; with none, the force fizzles. If the exit's destination is occupied, you choose whether it collides and swaps or holds its ground."],
+    ["Why didn't the knight I was aiming a force at move at all?", "Knights are never directly affected by a Rook/Bishop/Queen/Pawn force — see Knortal above. If you saw an arrow pointing at a knight, look for where it exits from a different knight instead; that's the piece that actually moves."],
+    ["What does the little \"P\" badge on a penny mean?", "That penny is shielded — a pawn moved onto it. A shielded penny ignores every force except one from an opposing Queen."],
+    ["Why did my piece swap places with a knight instead of stopping in front of it, or being blocked?", "Any piece's own move that would otherwise be blocked by a knight can optionally land on the knight's square instead, swapping places with it — Kuantum-tunneling. It's not forced; if a non-swap destination was also legal, both options appear and you pick."],
+    ["Why did my knight swap places instead of just moving there?", "The square was occupied. A knight's own move onto an occupied square always swaps places with whatever's there (Kneleportation) rather than being blocked."],
+    ["What's the difference between Knortal, Kuantum-tunneling, and Kneleportation?", "Knortal is what happens when a FORCE reaches a knight during a reaction — it's redirected to a different knight, which is the one actually displaced. Kuantum-tunneling and Kneleportation are about MOVEMENT reaching a knight's square directly (a normal target's push/pull destination, or any piece's own move) — the mover swaps places with the knight. Kneleportation is specifically the knight's own move; Kuantum-tunneling is everything else swapping into a knight."],
+    ["Why do I have to click \"Apply Step\" even when there's nothing to choose?", "So every single movement in a reaction is visible before it happens, never silent. Even an unambiguous push shows its arrow and waits for you to confirm the step before it actually moves — the game never rearranges several pieces at once without showing you first."],
+    ["Why am I being asked to pick between two things?", "Two or more forces are trying to affect the same piece (or two pieces are both being pulled/pushed to the same square) within the same step — or, for Knortal specifically, there's more than one candidate knight a force could exit through, or the exit knight's destination is blocked. Pennychess doesn't guess — you choose. This is what makes it a \"Decision\" rather than an ordinary Reaction."],
+    ["What's the difference between a Reaction and a Decision, and what do REACTION: Single / CHAIN-REACTION: Step N mean?", "Every resolved force is a Reaction. A Decision is a Reaction where you had to choose between competing outcomes. The Reactions panel title tracks which step of the current chain you're in — \"REACTION: Single\" if this is the only step so far, \"CHAIN-REACTION: Step N\" once more steps follow. It counts steps taken, not steps remaining — that can't be known ahead of choices you haven't made yet."],
+    ["What does \"Net Force Zero — Translational Equilibrium\" mean?", "The same exact conflict came up 3 times in a row with nothing changing. Rather than ask you a 4th time, the game treats the competing forces as canceling out and moves on — the object just stays where it is. (A Knortal routing choice that repeats the same way 3 times behaves similarly, defaulting to its first candidate.)"],
+    ["Can I undo a move?", "Yes — the Undo button reverts to your board state immediately before your last move (including everything that reacted afterward)."],
+    ["What do the \"H\" and \"T\" letters on the coins mean?", "Heads (your penny) and Tails (the opposing penny) — a nod to the original ruleset's coin-flip flavor."],
+    ["What's the difference between \"Perfect Solve\" and \"New Record\"?", "Perfect Solve means you matched the level's listed move-minimum exactly. New Record means you beat it — solved in fewer moves than the designer's own estimate. Either way it still counts as solved even if you use more moves than the minimum."],
+  ];
+  document.getElementById('faqBody').innerHTML = qas.map(([q,a])=>
+    `<div class="qa"><b>${escapeHtml(q)}</b>${escapeHtml(a)}</div>`
+  ).join('');
+}
+
+buildPieceTable();
+buildFullRuleSet();
+buildFAQs();
+buildLevelList();
+loadLevel('lvlm3');
+</script>
+</body>
+</html>
